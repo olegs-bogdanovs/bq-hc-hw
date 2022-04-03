@@ -80,11 +80,11 @@ USER_ACTIVITY_SCHEMA = {
 }
 
 DATA_CLEAN_QUERY = """
-CREATE TABLE hyper-cell-home-work.user_activity_data.cleaned_user_activity AS
+CREATE TABLE {}.{}.{} AS
 WITH filtered_values AS (
     SELECT 
         * 
-    FROM `hyper-cell-home-work.user_activity_data.raw_user_activity`
+    FROM `{}.{}.{}`
     WHERE user_pseudo_id IS NOT NULL
         AND current_config_version IS NOT NULL
         AND session_id IS NOT NULL
@@ -108,17 +108,17 @@ WITH filtered_values AS (
 SELECT filt.* FROM percentile perc
 LEFT JOIN filtered_values filt on perc.user_pseudo_id = filt.user_pseudo_id
 WHERE percentile < 0.95
-"""
+""".format(PROJECT_ID, DEFAULT_DATASET_NAME, DEFAULT_CLEANED_TABLE_NAME, PROJECT_ID, DEFAULT_DATASET_NAME, DEFAULT_RAW_TABLE_NAME)
 
 LEVEL_COMPLETION_QUERY = """
-CREATE TABLE hyper-cell-home-work.user_activity_data.level_completion_summary_{} AS
+CREATE TABLE {}.{}.level_completion_summary_{} AS
 WITH events_per_session AS (
     SELECT 
         current_config_version, 
         session_id,
         user_pseudo_id,
         count(*) as event_count 
-    FROM `hyper-cell-home-work.user_activity_data.cleaned_user_activity`
+    FROM `{}.{}.{}`
     WHERE event_name = 'level_complete'
     GROUP BY current_config_version, user_pseudo_id, session_id
 ), median_per_current_config AS (
@@ -145,15 +145,15 @@ SELECT
     mpcs.median_count AS median_levels_per_session 
 FROM avg_and_user_count av
 LEFT JOIN median_per_current_config mpcs ON av.current_config_version = mpcs.current_config_version
-""".format(execution_datetime)
+""".format(PROJECT_ID, DEFAULT_DATASET_NAME, execution_datetime, PROJECT_ID, DEFAULT_DATASET_NAME, DEFAULT_CLEANED_TABLE_NAME)
 
 ADS_SUMMARY_QUERY = """
-CREATE TABLE hyper-cell-home-work.user_activity_data.ads_summary_{} AS
+CREATE TABLE {}.{}.ads_summary_{} AS
 WITH dau AS(
     SELECT 
         current_config_version, 
         count(distinct user_pseudo_id) user_count
-    FROM `hyper-cell-home-work.user_activity_data.cleaned_user_activity`
+    FROM `{}.{}.{}`
     GROUP BY current_config_version
 ), ads AS(
     SELECT 
@@ -162,7 +162,7 @@ WITH dau AS(
         event_name,
         count(*) as ads_count
 
-    FROM hyper-cell-home-work.user_activity_data.cleaned_user_activity
+    FROM {}.{}.{}
     WHERE event_name = 'rew_start' OR event_name = 'int_start'
     GROUP BY current_config_version, ad_placement, event_name
 )
@@ -174,7 +174,8 @@ SELECT
     (ads.ads_count / dau.user_count) as count_per_dau
 FROM ads
 LEFT JOIN dau ON ads.current_config_version = dau.current_config_version
-""".format(execution_datetime)
+""".format(PROJECT_ID, DEFAULT_DATASET_NAME, execution_datetime, PROJECT_ID, DEFAULT_DATASET_NAME, DEFAULT_CLEANED_TABLE_NAME,
+PROJECT_ID, DEFAULT_DATASET_NAME, DEFAULT_CLEANED_TABLE_NAME)
 
 # This function downloads file from GDrive
 def download_file_from_gdrive(file_id, output_path):
